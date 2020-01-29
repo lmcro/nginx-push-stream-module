@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2010-2015 Wandenberg Peixoto <wandenberg@gmail.com>, Rogério Carvalho Schneider <stockrt@gmail.com>
+ * Copyright (C) 2010-2019 Wandenberg Peixoto <wandenberg@gmail.com>, Rogério Carvalho Schneider <stockrt@gmail.com>
  *
  * This file is part of Nginx Push Stream Module.
  *
@@ -96,7 +96,6 @@ typedef struct {
     ngx_queue_t                     msg_templates;
     ngx_flag_t                      timeout_with_body;
     ngx_str_t                       events_channel_id;
-    ngx_http_push_stream_channel_t *events_channel;
     ngx_regex_t                    *backtrack_parser_regex;
     ngx_http_push_stream_msg_t     *ping_msg;
     ngx_http_push_stream_msg_t     *longpooling_timeout_msg;
@@ -224,8 +223,11 @@ typedef struct {
     uint64_t payload_len;
     u_char  header[8];
     u_char *payload;
-    u_char *last;
     ngx_uint_t step;
+    ngx_buf_t  buf;
+    ngx_str_t consolidated;
+    unsigned char fragmented:1;
+    unsigned char last_fragment:1;
 } ngx_http_push_stream_frame_t;
 
 typedef struct {
@@ -286,6 +288,7 @@ struct ngx_http_push_stream_shm_data_s {
     ngx_queue_t                             channels_to_delete;
     ngx_shmtx_t                             channels_to_delete_mutex;
     ngx_shmtx_sh_t                          channels_to_delete_lock;
+    ngx_uint_t                              channels_in_delete; // # of channels in to delete queue
     ngx_uint_t                              channels_in_trash;  // # of channels in trash queue
     ngx_uint_t                              messages_in_trash;  // # of messages in trash queue
     ngx_http_push_stream_worker_data_t      ipc[NGX_MAX_PROCESSES]; // interprocess stuff
@@ -304,6 +307,7 @@ struct ngx_http_push_stream_shm_data_s {
     ngx_shmtx_sh_t                          cleanup_lock;
     ngx_shmtx_t                             events_channel_mutex;
     ngx_shmtx_sh_t                          events_channel_lock;
+    ngx_http_push_stream_channel_t         *events_channel;
 };
 
 ngx_shm_zone_t     *ngx_http_push_stream_global_shm_zone = NULL;

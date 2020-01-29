@@ -315,7 +315,7 @@ describe("PushStream", function() {
               $.ajax({
                 url: "http://" + nginxServer + "/pub?id=" + channelName,
                 success: function(data) {
-                  expect(data.subscribers).toBe("1");
+                  expect(data.subscribers).toBe(1);
                   done();
                 }
               });
@@ -377,7 +377,7 @@ describe("PushStream", function() {
           $.ajax({
             url: "http://" + nginxServer + "/pub?id=" + channelName,
             success: function(data) {
-              expect(data.subscribers).toBe("1");
+              expect(data.subscribers).toBe(1);
               pushstream.disconnect();
             }
           });
@@ -396,6 +396,115 @@ describe("PushStream", function() {
         );
       });
     });
+
+    if ((mode === "websocket") || (mode === "stream")) {
+      describe("when the connection timeout", function() {
+        it("should call onerror callback with a timeout error type", function(done) {
+          var error = null;
+          pushstream = new PushStream({
+            modes: mode,
+            port: port,
+            onerror: function(err) {
+              error = err;
+            }
+          });
+          pushstream.addChannel(channelName);
+
+          pushstream.connect();
+
+          waitsForAndRuns(
+            function() { return error !== null; },
+
+            function() {
+              expect(pushstream.readyState).toBe(PushStream.CLOSED);
+              expect(error.type).toBe("timeout");
+              done();
+            },
+
+            6000
+          );
+        });
+      });
+
+      describe("when reconnecting", function() {
+        it("should reconnect after disconnected by the server", function(done) {
+          var status = [];
+          pushstream = new PushStream({
+            modes: mode,
+            port: port,
+            useJSONP: jsonp,
+            urlPrefixLongpolling: urlPrefixLongpolling,
+            reconnectOnTimeoutInterval: 500,
+            reconnectOnChannelUnavailableInterval: 500,
+            onstatuschange: function(st) {
+              if (PushStream.OPEN === st) {
+                status.push(st);
+              }
+            }
+          });
+          pushstream.addChannel(channelName);
+
+          pushstream.connect();
+
+          waitsForAndRuns(
+            function() { return status.length >= 2; },
+
+            function() {
+              expect(status).toEqual([PushStream.OPEN, PushStream.OPEN]);
+              setTimeout(function() {
+                $.ajax({
+                  url: "http://" + nginxServer + "/pub?id=" + channelName,
+                  success: function(data) {
+                    expect(data.subscribers).toBe(1);
+                    done();
+                  }
+                });
+              }, 1000);
+            },
+
+            7000
+          );
+        });
+
+        it("should not reconnect after disconnected by the server if autoReconnect is off", function(done) {
+          var status = [];
+          pushstream = new PushStream({
+            modes: mode,
+            port: port,
+            useJSONP: jsonp,
+            urlPrefixLongpolling: urlPrefixLongpolling,
+            reconnectOnTimeoutInterval: 500,
+            reconnectOnChannelUnavailableInterval: 500,
+            autoReconnect: false,
+            onstatuschange: function(st) {
+              status.push(st);
+            }
+          });
+          pushstream.addChannel(channelName);
+
+          pushstream.connect();
+
+          waitsForAndRuns(
+            function() { return status.length >= 3; },
+
+            function() {
+              expect(status).toEqual([PushStream.CONNECTING, PushStream.OPEN, PushStream.CLOSED]);
+              setTimeout(function() {
+                $.ajax({
+                  url: "http://" + nginxServer + "/pub?id=" + channelName,
+                  success: function(data) {
+                    expect(data.subscribers).toBe(0);
+                    done();
+                  }
+                });
+              }, 2000);
+            },
+
+            7000
+          );
+        });
+      });
+    }
 
     describe("when adding a new channel", function() {
       it("should reconnect", function(done) {
@@ -480,7 +589,7 @@ describe("PushStream", function() {
               $.ajax({
                 url: "http://" + nginxServer + "/pub?id=" + channelName,
                 success: function(data) {
-                  expect(data.published_messages).toBe("1");
+                  expect(data.published_messages).toBe(1);
                 }
               });
             });
@@ -599,7 +708,7 @@ describe("PushStream", function() {
               $.ajax({
                 url: "http://" + nginxServer + "/pub?id=" + channelName,
                 success: function(data) {
-                  expect(data.subscribers).toBe("0");
+                  expect(data.subscribers).toBe(0);
                   $.post("http://" + nginxServer + "/pub?id=" + channelName, "another test message", function() {
                     pushstream.connect();
                   });
@@ -674,7 +783,7 @@ describe("PushStream", function() {
               $.ajax({
                 url: "http://" + nginxServer + "/pub?id=" + channelName,
                 success: function(data) {
-                  expect(data.subscribers).toBe("0");
+                  expect(data.subscribers).toBe(0);
                   $.post("http://" + nginxServer + "/pub?id=" + channelName, "another test message", function() {
                     pushstream.connect();
                   });
@@ -752,7 +861,7 @@ describe("PushStream", function() {
               $.ajax({
                 url: "http://" + nginxServer + "/pub?id=" + channelName,
                 success: function(data) {
-                  expect(data.subscribers).toBe("0");
+                  expect(data.subscribers).toBe(0);
                   $.post("http://" + nginxServer + "/pub?id=" + channelName, "another test message 1", function() {
                     $.post("http://" + nginxServer + "/pub?id=" + channelName, "another test message 2", function() {
                       pushstream.connect();
@@ -829,7 +938,7 @@ describe("PushStream", function() {
               $.ajax({
                 url: "http://" + nginxServer + "/pub?id=" + channelName,
                 success: function(data) {
-                  expect(data.subscribers).toBe("0");
+                  expect(data.subscribers).toBe(0);
                   $.post("http://" + nginxServer + "/pub?id=" + channelName, "another test message 1", function() {
                     $.post("http://" + nginxServer + "/pub?id=" + channelName, "another test message 2", function() {
                       pushstream.connect();
@@ -921,7 +1030,7 @@ describe("PushStream", function() {
               $.ajax({
                 url: "http://" + nginxServer + "/pub?id=" + channelName,
                 success: function(data) {
-                  expect(data.subscribers).toBe("0");
+                  expect(data.subscribers).toBe(0);
                   $.post("http://" + nginxServer + "/pub?id=" + channelName, "another test message 1", function() {
                     $.ajax({
                       url: "http://" + nginxServer + "/pub?id=" + channelName,
@@ -1004,7 +1113,7 @@ describe("PushStream", function() {
               $.ajax({
                 url: "http://" + nginxServer + "/pub?id=" + channelName,
                 success: function(data) {
-                  expect(data.subscribers).toBe("0");
+                  expect(data.subscribers).toBe(0);
                   $.post("http://" + nginxServer + "/pub?id=" + channelName, "another test message 1", function() {
                     $.post("http://" + nginxServer + "/pub?id=" + channelName, "another test message 2", function() {
                       pushstream.connect();

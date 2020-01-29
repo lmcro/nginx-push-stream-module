@@ -128,7 +128,7 @@ Authors: Wandenberg Peixoto <wandenberg@gmail.com>, Rogério Carvalho Schneider 
       params = '';
       for (var attr in settings) {
         if (!settings.hasOwnProperty || settings.hasOwnProperty(attr)) {
-          params += '&' + attr + '=' + window.escape(settings[attr]);
+          params += '&' + attr + '=' + escapeText(settings[attr]);
         }
       }
       params = params.substring(1);
@@ -392,11 +392,11 @@ Authors: Wandenberg Peixoto <wandenberg@gmail.com>, Rogério Carvalho Schneider 
   };
 
   var escapeText = function(text) {
-    return (text) ? window.escape(text) : '';
+    return (text) ? window.encodeURIComponent(text) : '';
   };
 
   var unescapeText = function(text) {
-    return (text) ? window.unescape(text) : '';
+    return (text) ? window.decodeURIComponent(text) : '';
   };
 
   Utils.parseMessage = function(messageText, keys) {
@@ -535,7 +535,7 @@ Authors: Wandenberg Peixoto <wandenberg@gmail.com>, Rogério Carvalho Schneider 
       return;
     }
     this._closeCurrentConnection();
-    this.pushstream._onerror({type: ((event && ((event.type === "load") || (event.type === "close"))) || (this.pushstream.readyState === PushStream.CONNECTING)) ? "load" : "timeout"});
+    this.pushstream._onerror({type: ((event && ((event.type === "load") || ((event.type === "close") && (event.code === 1006)))) || (this.pushstream.readyState === PushStream.CONNECTING)) ? "load" : "timeout"});
   };
 
   /* wrappers */
@@ -732,6 +732,7 @@ Authors: Wandenberg Peixoto <wandenberg@gmail.com>, Rogério Carvalho Schneider 
 
     _onframeloaded: function() {
       Log4js.info("[Stream] frame loaded (disconnected by server)");
+      this.pushstream._onerror({type: "timeout"});
       this.connection.onload = null;
       this.disconnect();
     },
@@ -889,6 +890,7 @@ Authors: Wandenberg Peixoto <wandenberg@gmail.com>, Rogério Carvalho Schneider 
     this.pingtimeout = settings.pingtimeout || 30000;
     this.reconnectOnTimeoutInterval = settings.reconnectOnTimeoutInterval || 3000;
     this.reconnectOnChannelUnavailableInterval = settings.reconnectOnChannelUnavailableInterval || 60000;
+    this.autoReconnect = (settings.autoReconnect !== false);
 
     this.lastEventId = settings.lastEventId || null;
     this.messagesPublishedAfter = settings.messagesPublishedAfter;
@@ -1097,7 +1099,7 @@ Authors: Wandenberg Peixoto <wandenberg@gmail.com>, Rogério Carvalho Schneider 
     },
 
     _reconnect: function(timeout) {
-      if (this._keepConnected && !this._reconnecttimer && (this.readyState !== PushStream.CONNECTING)) {
+      if (this.autoReconnect && this._keepConnected && !this._reconnecttimer && (this.readyState !== PushStream.CONNECTING)) {
         Log4js.info("trying to reconnect in", timeout);
         this._reconnecttimer = window.setTimeout(linker(this._connect, this), timeout);
       }
